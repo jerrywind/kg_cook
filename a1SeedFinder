@@ -1,0 +1,82 @@
+import sys,os,re,urllib.request
+from html.parser import HTMLParser
+import socket  
+import time  
+
+# Step1 get keys , formart  key1\nkey2\n......
+keyList = [i.strip() for i in open("read.txt").readlines() if i.strip()]
+#print(keyList)
+# Remove exist output file
+if os.path.isfile(os.getcwd()+"/write.txt"):     
+    os.remove(os.getcwd()+"/write.txt") 
+#open("write.txt","w").writelines(i+"\n\n" for i in keyList)
+
+#Step2 connect to btspread'http://www.bt2mag.com/search/' use its search engine to fetch results
+#Step3 get all the results or top-n results,then use link 'http://www.bt2mag.com/magnet/detail/hash' to match mag download pages
+#mainSearchQuest = "http://www.btaia.com/search/"
+mainSearchQuest = "http://www.torrentkitty.net/search/"
+
+header = {'Connection': 'Keep-Alive',
+           'Accept': 'text/html, application/xhtml+xml, */*',
+           'Accept-Language': 'en-US,en;q=0.8,zh-Hans-CN;q=0.5,zh-Hans;q=0.3',
+           'User-Agent': 'Mozilla/5.0 (Windows NT 6.3; WOW64; Trident/7.0; rv:11.0) like Gecko'}
+
+#mainSearchQuest = "http://www.baidu.com/"
+# rewrite the Parser to fetch the intermediate link to the mag page
+topN = 10
+class UrlParser():
+        def __init__(self):
+                self.urls = []
+        def feed(self,data):
+                url = re.findall(r'''<a(\s*)(.*?)(\s*)href(\s*)=(\s*)([\"\s]*)(http:\/\/www\.bt2mag\.com\/magnet\/detail\/hash\/[^\"\']+?)([\"\s]+)(.*?)>''',data,re.S|re.I)
+                for u in url[0:topN]:
+                        self.urls.append(u[6])
+                print(self.urls)
+        def geturls(self):
+                return self.urls
+        def getMag(self):
+                magnets = []
+                for link in self.urls:
+                        #timeout = 20    
+                        #socket.setdefaulttimeout(timeout)#这里对整个socket层设置超时时间。后续文件中如果再使用到socket，不必再设置  
+                        #sleep_download_time = 10  
+                        #time.sleep(sleep_download_time) #这里时间自己设定
+                        req = urllib.request.Request(link,headers = header)
+                        oper = urllib.request.urlopen(req)
+                        #magLink =  urllib.request.urlopen(link).read().decode()
+                        magLink =  oper.read().decode()
+                        magnets += [re.search(r'''<textarea([^>]*)>(magnet:\?xt=urn:btih:.*)</textarea>''',magLink).group(2)]	
+                print(magnets)
+                return magnets					
+
+keyDict = {}
+F = open("write.txt","w+")
+for item in keyList:
+        #timeout = 20    
+        #socket.setdefaulttimeout(timeout)#这里对整个socket层设置超时时间。后续文件中如果再使用到socket，不必再设置  
+        #sleep_download_time = 10  
+        #time.sleep(sleep_download_time) #这里时间自己设定
+        req = urllib.request.Request(mainSearchQuest+item, headers = header)
+        oper = urllib.request.urlopen(req)
+        #HTMLcode = urllib.request.urlopen(mainSearchQuest+item).read().decode()
+        HTMLcode = oper.read().decode()
+        keyDict[item]=[]
+        url = UrlParser()
+        url.feed(HTMLcode)
+        keyDict[item] += url.getMag()
+        F.write(item+":\n\n")
+        for m in keyDict[item] :
+                #print("This is ",m)
+                F.write(m+"\n")
+        F.write("\n")
+        #Step4 copy the mag links from those pages and out put them into output.txt ,formart Name:\n\n mag1\n mag2\n......
+F.close()
+        #print(keyDict[item])
+print(keyDict)
+print("\nDone!")
+
+
+
+
+
+    
